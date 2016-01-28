@@ -40,11 +40,11 @@ class DirCrawl
       # Process file
       elsif !file.include?(@ignore_includes)
         processed = @process_block.call(dir+"/"+file, *args)
-        @output.push(processed)
+        @output.push(JSON.parse(processed))
 
         # Write to file
         create_write_dirs(dir.gsub(@path, @output_dir))
-        File.write(get_write_dir(dir, file), JSON.pretty_generate(processed))
+        File.write(get_write_dir(dir, file), processed)
       end
     end
   end
