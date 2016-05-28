@@ -2,12 +2,13 @@ require 'json'
 require 'pry'
 
 class DirCrawl
-  def initialize(path, output_dir, ignore_includes, save, process_block, include_block, *args)
-    @path = path
+  def initialize(path, output_dir, ignore_includes, save, process_block, include_block, extras_block, *args)
+	@path = path
     @output_dir = output_dir
     @ignore_includes = ignore_includes
     include_block.call
     @process_block = process_block
+	@extras_block = extras_block
     @output = Array.new
     @save = save
     crawl_dir(path, *args)
@@ -40,6 +41,14 @@ class DirCrawl
 
       # Process file
       elsif !file.include?(@ignore_includes)
+
+		# Create Dirs
+        create_write_dirs(dir.gsub(@path, @output_dir))
+
+		# Process Extras
+		extras = @extras_block.call(@output_dir+"/")
+
+		# Process Main
         processed = @process_block.call(dir+"/"+file, *args)
 
         # Only save in output if specified (to handle large dirs)
@@ -48,7 +57,6 @@ class DirCrawl
         end
         
         # Write to file
-        create_write_dirs(dir.gsub(@path, @output_dir))
         File.write(get_write_dir(dir, file), processed)
       end
     end
