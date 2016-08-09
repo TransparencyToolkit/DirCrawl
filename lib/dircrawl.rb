@@ -46,7 +46,9 @@ class DirCrawl
         create_write_dirs(dir.gsub(@path, @output_dir))
 
 		# Process Extras
-		extras = @extras_block.call(@output_dir+"/")
+		if @extras_block != ""
+			extras = @extras_block.call(@output_dir+"/")
+		end
 
 		# Process Main
         processed = @process_block.call(dir+"/"+file, *args)
