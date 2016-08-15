@@ -41,7 +41,7 @@ class DirCrawl
         crawl_dir(dir+"/"+file, *args)
 
       # Process file
-      elsif !file.include?(@ignore_includes)
+      elsif !file.include?(@ignore_includes) && !File.exist?(get_write_dir(dir, file))
 
 	# Create Dirs
         create_write_dirs(dir.gsub(@path, @output_dir))
