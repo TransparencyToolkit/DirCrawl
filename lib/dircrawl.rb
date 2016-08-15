@@ -55,7 +55,7 @@ class DirCrawl
 		# Process Main
                 processed = @process_block.call(dir+"/"+file, *args)
 
-        rescue # Catch any failures
+        rescue Exception => e # really catch any failures
           if @failure_mode == "debug"
             binding.pry
           elsif @failure_mode == "log"
