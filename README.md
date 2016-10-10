@@ -32,6 +32,6 @@ end
 
 ```
 d = DirCrawl.new("/input/path", "/output/path", "ignore files including",
-block, include, "args for", "block")
+block, include, debug mode, cm_hash or nil, "args for", "block")
 puts d.get_output
 ```
