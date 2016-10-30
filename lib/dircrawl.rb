@@ -48,6 +48,7 @@ class DirCrawl
       
       # Go to next dir
       if File.directory?(dir+"/"+file)
+        report_status("Going to next directory: " + dir+"/"+file)
         crawl_dir(dir+"/"+file, *args)
 
       # Process file
@@ -70,6 +71,7 @@ class DirCrawl
                 end
 
         rescue Exception => e # really catch any failures
+          report_status("Error on file "+file+": "+e.to_s
           if @failure_mode == "debug"
             binding.pry
           elsif @failure_mode == "log"
@@ -99,6 +101,16 @@ class DirCrawl
   def report_batch(results)
     results.each do |result|
       @output.push(result)
+    end
+  end
+
+  # Report Harvester status message
+  def report_status(status_msg)
+    if @cm_url
+      curl_url = @cm_url+"/update_status"
+      c = Curl::Easy.http_post(curl_url,
+                               Curl::PostField.content('selector_id', @selector_id),
+                               Curl::PostField.content('status_message', status_msg))
     end
   end
 

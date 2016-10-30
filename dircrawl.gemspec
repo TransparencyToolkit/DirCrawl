@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name        = 'dircrawl'
-  s.version     = '0.0.10'
-  s.date        = '2016-10-11'
+  s.version     = '0.0.11'
+  s.date        = '2016-10-30'
   s.summary     = 'Run block on all files in dir'
   s.description = 'Run block on all files in dir'
   s.authors     = ['M. C. McGrath', 'Brennan Novak']
