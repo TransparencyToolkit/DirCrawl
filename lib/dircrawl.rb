@@ -71,7 +71,7 @@ class DirCrawl
                 end
 
         rescue Exception => e # really catch any failures
-          report_status("Error on file "+file+": "+e.to_s
+          report_status("Error on file "+file+": "+e.to_s)
           if @failure_mode == "debug"
             binding.pry
           elsif @failure_mode == "log"
