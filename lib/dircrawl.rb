@@ -44,9 +44,10 @@ class DirCrawl
   # Crawl dir and call block for each file
   def crawl_dir(dir, *args)
     Dir.foreach(dir) do |file|
+      # Skip . or .. files
       next if file == '.' or file == '..'
-      
-      # Go to next dir
+
+      # Recurse into directories
       if File.directory?(dir+"/"+file)
         report_status("Going to next directory: " + dir+"/"+file)
         crawl_dir(dir+"/"+file, *args)
@@ -54,21 +55,27 @@ class DirCrawl
       # Process file
       elsif !file.include?(@ignore_includes)
 
-	# Create Dirs
+	    # Create Output Directory
         create_write_dirs(dir.gsub(@path, @output_dir))
 
         begin
-		# Process Extras
-		if @extras_block != ""
-			extras = @extras_block.call(@output_dir+"/")
-		end
 
-		# Process Main
-                if !File.exist?(get_write_dir(dir, file))
-                  processed = @process_block.call(dir+"/"+file, *args)
-                else
-                  processed = File.read(get_write_dir(dir, file))
-                end
+		# Check if processed file exists
+		# Skip processing (if yes)
+        if !File.exist?(get_write_dir(dir, file))
+
+		  # Process Extras
+		  if @extras_block != ""
+            extras = @extras_block.call(@output_dir+"/")
+		  end
+
+          # Now Process Main
+          processed = @process_block.call(dir+"/"+file, *args)
+        else
+		  puts "Processed file exists, skipping"
+          puts " " + dir + file
+          processed = File.read(get_write_dir(dir, file))
+        end
 
         rescue Exception => e # really catch any failures
           report_status("Error on file "+file+": "+e.to_s)
@@ -78,11 +85,11 @@ class DirCrawl
             IO.write(@output_dir+"/error_log.txt", file+"\n", mode: 'a')
           end
         end
-                
+
         # Only save in output if specified (to handle large dirs)
         report_results([JSON.parse(processed)], dir+"/"+file)
-        
-        # Write to file
+
+        # Write Output to file
         File.write(get_write_dir(dir, file), processed)
       end
     end
