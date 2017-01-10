@@ -73,7 +73,7 @@ class DirCrawl
           processed = @process_block.call(dir+"/"+file, *args)
         else
 		  puts "Processed file exists, skipping"
-          puts " " + dir + file
+          puts " " + dir + "/" + file
           processed = File.read(get_write_dir(dir, file))
         end
 
