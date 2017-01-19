@@ -60,29 +60,30 @@ class DirCrawl
 
         begin
 
-		# Check if processed file exists
-		# Skip processing (if yes)
-        if !File.exist?(get_write_dir(dir, file))
+		  # Check if processed file exists
+		  # Skip processing (if yes)
+          if !File.exist?(get_write_dir(dir, file))
 
-		  # Process Extras
-		  if @extras_block != ""
-            extras = @extras_block.call(@output_dir+"/")
-		  end
+		    # Process Extras
+		    if @extras_block != ""
+              extras = @extras_block.call(@output_dir+"/")
+		    end
 
-          # Now Process Main
-          processed = @process_block.call(dir+"/"+file, *args)
-        else
-		  puts "Processed file exists, skipping"
-          puts " " + dir + "/" + file
-          processed = File.read(get_write_dir(dir, file))
-        end
+            # Now Process Main
+            processed = @process_block.call(dir+"/"+file, *args)
+          else
+		    puts "Processed file exists, skipping"
+            puts " " + dir + "/" + file
+            processed = File.read(get_write_dir(dir, file))
+          end
 
         rescue Exception => e # really catch any failures
           report_status("Error on file "+file+": "+e.to_s)
           if @failure_mode == "debug"
             binding.pry
           elsif @failure_mode == "log"
-            IO.write(@output_dir+"/error_log.txt", file+"\n", mode: 'a')
+            error_file = dir + "/" + file + "\n"
+            IO.write(@output_dir+"/error_log.txt", error_file, mode: 'a')
           end
         end
 
