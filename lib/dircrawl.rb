@@ -1,47 +1,27 @@
 require 'json'
 require 'pry'
-require 'curb'
-require 'selenium-webdriver'
-require 'uri'
+require 'harvesterreporter'
 
+# Crawls a directory of files and runs a block of code on it
 class DirCrawl
-  def initialize(path, output_dir, ignore_includes, save, process_block, include_block, extras_block, failure_mode, cm_hash, *args)
-    @path = path
-    @output_dir = output_dir
-    @ignore_includes = ignore_includes
+  def initialize(path_params, process_block, include_block, extras_block, cm_hash, *args)
+    # Set the params for the path
+    @path = path_params[:path]
+    @output_dir = path_params[:output_dir]
+    @ignore_includes = path_params[:ignore_includes]
+    @failure_mode = path_params[:failure_mode]
+
+    # Setup the blocks to run
     include_block.call
     @process_block = process_block
     @extras_block = extras_block
-    @failure_mode = failure_mode
-    @output = Array.new
-    @save = save
 
-    # Handle crawler manager info
-    @cm_url = cm_hash[:crawler_manager_url] if cm_hash
-    @selector_id = cm_hash[:selector_id] if cm_hash
-
-    # Crawl
-    crawl_dir(path, *args)
+    # Setup the Harvester reporter to report the results
+    @reporter = HarvesterReporter.new(cm_hash)
+    crawl_dir(@path, *args)
   end
 
-  # Figure out where to write it
-  def get_write_dir(dir, file)
-    dir_save = dir.gsub(@path, @output_dir)
-    return dir_save+"/"+file+".json"
-  end
-
-  # Create if they don't exist
-  def create_write_dirs(dir)
-    dirs = dir.split("/")
-    dirs.delete("")
-    overallpath = ""
-    dirs.each do |d|
-      Dir.mkdir(overallpath+"/"+d) if !File.directory?(overallpath+"/"+d)
-      overallpath += ("/"+d)
-    end
-  end
-  
-  # Crawl dir and call block for each file
+  # Crawls the directory sppecified
   def crawl_dir(dir, *args)
     Dir.foreach(dir) do |file|
       # Skip . or .. files
@@ -49,90 +29,65 @@ class DirCrawl
 
       # Recurse into directories
       if File.directory?(dir+"/"+file)
-        report_status("Going to next directory: " + dir+"/"+file)
-        crawl_dir(dir+"/"+file, *args)
+        crawl_dir("#{dir}/#{file}", *args)
 
       # Process file
       elsif !file.include?(@ignore_includes)
-
-	    # Create Output Directory
-        create_write_dirs(dir.gsub(@path, @output_dir))
-
         begin
-
-		  # Check if processed file exists
-		  # Skip processing (if yes)
-          if !File.exist?(get_write_dir(dir, file))
-
-		    # Process Extras
-		    if @extras_block != ""
-              extras = @extras_block.call(@output_dir+"/")
-		    end
-
-            # Now Process Main
-            processed = @process_block.call(dir+"/"+file, *args)
-          else
-		    puts "Processed file exists, skipping"
-            puts " " + dir + "/" + file
-            processed = File.read(get_write_dir(dir, file))
-          end
-
-        rescue Exception => e # really catch any failures
-          report_status("Error on file "+file+": "+e.to_s)
-          if @failure_mode == "debug"
-            binding.pry
-          elsif @failure_mode == "log"
-            error_file = dir + "/" + file + "\n"
-            IO.write(@output_dir+"/error_log.txt", error_file, mode: 'a')
-          end
+          output_results(process_file(dir, file, *args), dir, file)
+        rescue Exception => e
+          handle_failure(e, dir, file, *args)
         end
-
-        # Only save in output if specified (to handle large dirs)
-        report_results([JSON.parse(processed)], dir+"/"+file)
-
-        # Write Output to file
-        File.write(get_write_dir(dir, file), processed)
       end
     end
   end
 
-  # Figure out how to report results
-  def report_results(results, path)
-    if @cm_url
-      report_incremental(results, path)
-    else
-      report_batch(results)
+  # Process a file using the blocks given
+  def process_file(dir, file, *args)
+    create_write_dirs(dir.gsub(@path, @output_dir))
+
+    # Run blocks to process the file
+    if !File.exist?(get_write_path(dir, file))
+      @extras_block.call("#{@output_dir}/") if !@extras_block.empty?
+      return @process_block.call("#{dir}/#{file}", *args)
+    else # Use already existing file
+      puts "Processed file exists, skipping: #{dir}/#{file}"
+      return File.read(get_write_path(dir, file))
     end
   end
 
-  # Report all results in one JSON
-  def report_batch(results)
-    results.each do |result|
-      @output.push(result)
+  # Output the results to Harvester and file dir
+  def output_results(processed, dir, file)
+    @reporter.report_results([JSON.parse(processed)], "#{dir}/#{file}")
+    File.write(get_write_path(dir, file), processed)
+  end
+
+  # Create if they don't exist
+  def create_write_dirs(dir)
+    dirs = dir.split("/")
+    dirs.delete("")
+
+    # Go through and create all subdirs
+    overallpath = ""
+    dirs.each do |d|
+      Dir.mkdir(overallpath+"/"+d) if !File.directory?(overallpath+"/"+d)
+      overallpath += ("/"+d)
     end
   end
 
-  # Report Harvester status message
-  def report_status(status_msg)
-    if @cm_url
-      curl_url = @cm_url+"/update_status"
-      c = Curl::Easy.http_post(curl_url,
-                               Curl::PostField.content('selector_id', @selector_id),
-                               Curl::PostField.content('status_message', status_msg))
+  # Figure out where to write the file
+  def get_write_path(dir, file)
+    dir_save = dir.gsub(@path, @output_dir)
+    return "#{dir_save}/#{file}.json"
+  end
+
+  # Handle different failure modes
+  def handle_failure(error, dir, file, *args)
+    if @failure_mode == "debug"
+      binding.pry
+    elsif @failure_mode == "log"
+      error_file = "#{dir}/#{file}\n"
+      IO.write(@output_dir+"/error_log.txt", error_file, mode: 'a')
     end
-  end
-
-  # Report results back to Harvester incrementally
-  def report_incremental(results, path)
-    curl_url = @cm_url+"/relay_results"
-    c = Curl::Easy.http_post(curl_url,
-                             Curl::PostField.content('selector_id', @selector_id),
-                             Curl::PostField.content('status_message', "Processed " + path),
-                             Curl::PostField.content('results', JSON.pretty_generate(results)))
-  end
-
-  # Get the output array
-  def get_output
-    return JSON.pretty_generate(@output)
   end
 end
