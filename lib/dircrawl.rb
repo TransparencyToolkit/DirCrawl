@@ -48,7 +48,7 @@ class DirCrawl
 
     # Run blocks to process the file
     if !File.exist?(get_write_path(dir, file))
-      @extras_block.call("#{@output_dir}/") if !@extras_block.empty?
+      @extras_block.call("#{@output_dir}/") if !@extras_block
       return @process_block.call("#{dir}/#{file}", *args)
     else # Use already existing file
       puts "Processed file exists, skipping: #{dir}/#{file}"
